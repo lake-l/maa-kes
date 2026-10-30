@@ -2,7 +2,7 @@ name: Sync JSON Schema Files from MaaFramework
 
 on:
   schedule:
-    - cron: '10 0 * * *'  # UTC 00:10 每天运行
+    - cron: '17 0 * * *'  # UTC 00:17 每天运行；更新 cron 以恢复闲置停用的定时任务
   
   workflow_dispatch:
 
@@ -17,11 +17,11 @@ jobs:
     steps:
       - id: check
         run: |
-          if [[ "${{ github.repository }}" == "MaaXYZ/MaaPracticeBoilerplate" ]]; then
-            echo "Repository is MaaXYZ/MaaPracticeBoilerplate, proceeding with sync"
+          if [[ "${{ github.repository }}" == "lake-l/maa-kes" ]]; then
+            echo "Repository is lake-l/maa-kes, proceeding with sync"
             echo "should_run=true" >> $GITHUB_OUTPUT
           else
-            echo "Repository is not MaaXYZ/MaaPracticeBoilerplate, skipping sync"
+            echo "Repository is not lake-l/maa-kes, skipping sync"
             echo "should_run=false" >> $GITHUB_OUTPUT
           fi
 
@@ -41,15 +41,13 @@ jobs:
           # 确保目标目录存在
           mkdir -p deps/tools
 
-          # 下载四个JSON schema文件
-          curl -s -o deps/tools/interface.schema.json https://raw.githubusercontent.com/MaaXYZ/MaaFramework/main/tools/interface.schema.json || echo "Failed to download interface.schema.json"
-          curl -s -o deps/tools/interface_config.schema.json https://raw.githubusercontent.com/MaaXYZ/MaaFramework/main/tools/interface_config.schema.json || echo "Failed to download interface_config.schema.json"
-          curl -s -o deps/tools/interface_import.schema.json https://raw.githubusercontent.com/MaaXYZ/MaaFramework/main/tools/interface_import.schema.json || echo "Failed to download interface_import.schema.json"
-          curl -s -o deps/tools/pipeline.schema.json https://raw.githubusercontent.com/MaaXYZ/MaaFramework/main/tools/pipeline.schema.json || echo "Failed to download pipeline.schema.json"
-
-          # 检查文件是否成功下载
-          echo "Checking downloaded files:"
-          ls -la deps/tools/*.schema.json
+          # 下载失败或 JSON 无效时立即停止，避免提交错误响应。
+          for file in interface.schema.json interface_config.schema.json interface_import.schema.json pipeline.schema.json; do
+            curl --fail --silent --show-error --location --retry 3 \
+              -o "deps/tools/$file" \
+              "https://raw.githubusercontent.com/MaaXYZ/MaaFramework/main/tools/$file"
+            python -m json.tool "deps/tools/$file" > /dev/null
+          done
 
       - name: Check for changes with git status
         id: check_status
